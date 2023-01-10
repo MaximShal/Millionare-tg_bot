@@ -1,7 +1,10 @@
 from questions import questions, answers
 from random import randint, shuffle
-from art import tprint
-import time
+from aiogram import Bot, types
+from aiogram.dispatcher import Dispatcher
+from aiogram.utils import executor
+from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+import os
 
 
 class Questions:
@@ -34,7 +37,7 @@ class Questions:
         return game_questions
 
     def create_answers(self):
-        # 'создание 4 ответов к каждому вопросу один из которых правильный'
+        # 'id вопроса, создание 4 ответов к каждому вопросу один из которых правильный'
         game_answers = {}
 
         for number_of_question in self._questions:
@@ -48,7 +51,7 @@ class Questions:
     def take_question(self):
         return self._questions[self.keys[0]]
 
-    def take_answers(self):
+    def take_answer(self):
         return self.answers[self.keys[0]]
 
     def check_answer(self, player_answer):
@@ -70,7 +73,7 @@ class Game:
     def check_correct_answer(self):
         player_answer = input('>')
         if player_answer in self.varriants:
-            if self.que.check_answer(self.que.take_answers()[self.varriants.index(player_answer)]):
+            if self.que.check_answer(self.que.take_answer()[self.varriants.index(player_answer)]):
                 self.total += 1
             self.que.next_question()
         else:
@@ -80,40 +83,49 @@ class Game:
     def start_game(self):
         for _ in range(15):
             print(f'\n{self.que.take_question()}')
-            for a, b in zip(self.varriants, self.que.take_answers()):
+            for a, b in zip(self.varriants, self.que.take_answer()):
                 print(a, b)
             self.check_correct_answer()
         print(f'Викторина окончена, Ваш результат: {self.total} из 15 правильных ответов.')
 
 
 def menu():
-    tprint("Millionaire Quiz", font="thin")
+    bot = Bot(token=os.getenv('TOKEN'))
+    dp = Dispatcher(bot)
+    photo = open('images/main.png', 'rb')
     help_text = " Приветствую тебя в бета тестированни игры как стать миллионером. По скольку проект маленький " \
                 "детали игры могут отличаться от оригинала, оставь свой коментарий на гите, я постараюсь в ближайшее " \
                 "время выпустить обновление.\n На данном етапе имееться рандомный выбор ответов из правильных.\n" \
                 " В скоре будет добавлена позможность выбора помощи зала, друга и 50/50, так же вместо тотала " \
-                "правильных ответов, будет отображаться сумма выйграша.\n\n" \
-                " Для новой игры укажи 'new'\n Выход 'q' или 'Q'\n"
-    for i in help_text:
-        if i == ' ':
-            print(' ', end='')
-            continue
-        time.sleep(0.05)
-        print(i, end='', flush=True)
+                "правильных ответов, будет отображаться сумма выйграша.\n\n"
+    keyboard = ReplyKeyboardMarkup()
+    button_new = KeyboardButton('Новая игра')
+    keyboard.add(button_new)
 
-    request1 = input('>')
-    if request1.lower() == 'new':
-        for i in '\n И так, для тебя подготовили 15 вопросов твоя задача дать как можно больше правильных ответов.\n ' \
-                 'для продолжения нажми Enter<-':
-            time.sleep(0.02)
-            print(i, end='', flush=True)
-        input()
-        g = Game()
-        g.start_game()
-    elif request1.lower() == 'q':
-        pass
-    else:
-        menu()
+    @dp.message_handler(commands=['start', 'help'])
+    async def command_start(message: types.Message):
+        await message.reply('ok', reply_markup=keyboard)
+        await bot.send_photo(message.from_user.id, photo)
+        await bot.send_message(message.from_user.id, help_text)
+
+    @dp.message_handler()
+    async def new_game(message: types.Message):
+        if message.text.lower() == 'новая игра':
+            await message.reply('создаю игру', reply_markup=keyboard.add(KeyboardButton('hihi')))
+
+    executor.start_polling(dp, skip_updates=True)
+
+    # request1 = input('>')
+    # if request1.lower() == 'new':
+    #     print('\n И так, для тебя подготовили 15 вопросов твоя задача дать как можно больше правильных ответов.\n '
+    #           'для продолжения нажми Enter<-')
+    #     input()
+    #     g = Game()
+    #     g.start_game()
+    # elif request1.lower() == 'q':
+    #     pass
+    # else:
+    #     menu()
 
 
 if __name__ == '__main__':
