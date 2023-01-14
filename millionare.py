@@ -126,7 +126,7 @@ class Game:
                                           reply_markup=kb3)
 
 
-def menu():
+if __name__ == '__main__':
     @dp.message_handler(commands=['start', 'help'])
     async def command_start(message: types.Message):
         await bot.send_photo(message.from_user.id, photo)
@@ -155,7 +155,3 @@ def menu():
         asyncio.create_task(g.send_question(callback_query.from_user.id))
 
     executor.start_polling(dp, skip_updates=True)
-
-
-if __name__ == '__main__':
-    menu()
