@@ -10,18 +10,19 @@ import datetime
 from threading import Thread
 import time
 
-
 bot = Bot(token=os.getenv('TOKEN'))
 dp = Dispatcher(bot)
+loop = asyncio.new_event_loop()
 clients_obj_game = {}
 clients_time_msg = {}
+clients_username = {}
 help_text = " Приветствую тебя в бета тестированни игры как стать миллионером. По скольку проект маленький " \
             "детали игры могут отличаться от оригинала, оставь свой коментарий на гите, я постараюсь в ближайшее " \
             "время выпустить обновление.\n На данном етапе имееться рандомный выбор ответов из правильных.\n" \
             " В скоре будет добавлена позможность выбора помощи зала, друга и 50/50.\n\n"
 button_new = InlineKeyboardButton('Новая игра', callback_data='button_new')
 keyboard_start = InlineKeyboardMarkup().add(button_new)
-button1 = InlineKeyboardButton('-- Продолжить --', callback_data='continue_start')
+button1 = InlineKeyboardButton('Продолжить', callback_data='continue_start')
 button3 = InlineKeyboardButton('Продолжить', callback_data='continue')
 button4 = KeyboardButton('/start')
 kb1 = InlineKeyboardMarkup().add(button1)
@@ -84,9 +85,6 @@ class Questions:
     def next_question(self):
         del self.keys[0]
 
-    def test(self):
-        return self.keys
-
 
 class Game:
     def __init__(self):
@@ -96,8 +94,10 @@ class Game:
         self.money = ['0', '100', '200', '300', '500', '1k', '2k', '4k', '8k', '16k', '32k', '64k', '125k', '250k',
                       '500k', '1000k']
         self.__game_flag = False
+        print(self.que.keys)
 
     async def final(self, user_id):
+        print(f'{clients_username[user_id]} won 1 million!!!')
         await bot.send_photo(user_id, types.InputFile('images/final.png'))
         await bot.send_message(user_id, f'Вы выиграли {self.money[self.total]} UAH.',
                                reply_markup=keyboard_start)
@@ -123,30 +123,31 @@ class Game:
 
     async def send_msg_after_check(self, user_id):
         if self.__game_flag:
+            print(f'{clients_username[user_id]} lost...')
             if self.total >= 5:
                 await bot.send_message(user_id, f'Не в этот раз, но Вы уходите не с пустыми руками, у вас '
                                                 f'есть незгораемая сумма {self.money[self.total - self.total % 5]} UAH.',
-                                       reply_markup=kb4)
+                                       reply_markup=keyboard_start)
             else:
                 await bot.send_message(user_id, 'К моему сожелению Вы проиграли =_(',
-                                       reply_markup=kb4)
+                                       reply_markup=keyboard_start)
         else:
-            if self.total >= 5:
-                await bot.send_message(user_id, f'Вы выиграли {self.money[self.total]} UAH. У Вас есть незгораемая '
-                                                f'сумма {self.money[self.total - self.total % 5]} UAH. Хотите продолжить?',
-                                       reply_markup=kb3)
-            else:
-                await bot.send_message(user_id, f'Вы выиграли {self.money[self.total]} UAH. Хотите продолжить?',
-                                       reply_markup=kb3)
-
-    def test(self):
-        return self.que.test()
+            if self.total < 15:
+                if self.total >= 5:
+                    await bot.send_message(user_id, f'Вы выиграли {self.money[self.total]} UAH. У Вас есть незгораемая '
+                                                    f'сумма {self.money[self.total - self.total % 5]} UAH. Хотите '
+                                                    f'продолжить?',
+                                           reply_markup=kb3)
+                else:
+                    await bot.send_message(user_id, f'Вы выиграли {self.money[self.total]} UAH. Хотите продолжить?',
+                                           reply_markup=kb3)
 
 
 if __name__ == '__main__':
     def time_control(user_id):
         user_id_time_msg = user_id + 1
         clients_time_msg[user_id_time_msg] = datetime.datetime.now()
+
 
     @dp.message_handler(commands=['start', 'help'])
     async def command_start(message: types.Message):
@@ -157,9 +158,10 @@ if __name__ == '__main__':
 
     @dp.callback_query_handler(lambda c: c.data == 'button_new')
     async def callback_kb_main_pre_new(callback_query: types.CallbackQuery):
+        clients_username[callback_query.from_user.id] = callback_query.from_user.username
         time_control(callback_query.from_user.id)
         clients_obj_game[callback_query.from_user.id] = Game()
-        print(callback_query.from_user.id, 'Object of game created')
+        print(f'Game created for "{callback_query.from_user.username}"')
         await bot.send_message(callback_query.from_user.id,
                                'И так, для тебя подготовили 15 вопросов твоя задача дать как можно больше правильных '
                                'ответов.\n Для продолжения нажми "Продолжить"',
@@ -189,16 +191,20 @@ if __name__ == '__main__':
 
     def control_clients():
         while True:
-            for i, k in clients_time_msg.items():
-                time1 = (datetime.datetime.now()-k)
-                print(time1.total_seconds() / 60)
-                if time1.total_seconds() / 60 > 0:
-                    del clients_obj_game[i-1]
-                    del clients_time_msg[i]
-                    print(i-1, 'Object of game deleted')
-                    bot.send_message(i-1, 'Вы ушли по этому мне пришлось удалить эту игру, '
-                                                'для начала нажмите "/start"', reply_markup=kb4)
-            time.sleep(5)
+            try:
+                for i, k in list(clients_time_msg.items()):
+                    time1 = (datetime.datetime.now() - k)
+                    if time1.total_seconds() / 60 > 10:
+                        loop.create_task(bot.send_message(i - 1, 'Вы ушли по этому мне пришлось удалить эту игру, '
+                                                                 'для начала нажмите "/start"', reply_markup=kb4))
+                        print(f'{clients_username[i - 1]}')
+                        del clients_obj_game[i - 1]
+                        del clients_username[i - 1]
+                        del clients_time_msg[i]
+            except KeyError:
+                pass
+            time.sleep(120)
+
 
     thread1 = Thread(name='control_clients', target=control_clients)
     thread1.start()
