@@ -1,4 +1,4 @@
 # Millionare-tg_bot
-OOP, aiogram, asyncio
+OOP, aiogram, asyncio, threading
 
 For use add your Telegram API token in bot_run.bat(set TOKEN=your token)
